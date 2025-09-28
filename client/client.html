@@ -2,11 +2,113 @@
 <html lang="en">
 <head>
   <title>Our simple HTTP server</title>
-  <link rel="stylesheet" type="text/css" href="/style.css">
+  <link rel="stylesheet" type="text/css" href="style.css">
   
-  <script>
+ <script>
+  // element grabber helper
+  const $ = (id) => document.getElementById(id);
 
-  </script>
+  // simple render
+  const render = (lines) => {
+    $('content').textContent = Array.isArray(lines) ? lines.join('\n') : String(lines);
+  };
+
+  const safeJSON = (text) => {
+    try { return JSON.parse(text || '{}'); } catch { return {}; }
+  };
+
+  //POST: /addUser
+  window.addEventListener('DOMContentLoaded', () => {
+    const nameForm = $('nameForm');
+    nameForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(nameForm);
+      const body = new URLSearchParams(formData).toString();
+
+      try {
+        const res = await fetch(nameForm.action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          body,
+        });
+
+        // 204
+        if (res.status === 204) {
+          render(['Status: 204', '(No Content) – existing user updated.']);
+          return;
+        }
+
+        const raw = await res.text();
+        console.log('RAW (POST /addUser):', raw);
+        const data = safeJSON(raw);
+
+        // 201 or 400 Bad Request
+        render([
+          `Status: ${res.status}`,
+          '',
+          JSON.stringify(data, null, 2),
+        ]);
+      } catch (err) {
+        render(`Error: ${err.message}`);
+      }
+    });
+
+    // GET/HEAD: /getUsers or /notReal
+    const userForm = $('userForm');
+    userForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const url = $('urlField').value;
+      const method = $('methodSelect').value.toUpperCase();
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Accept': 'application/json' },
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+
+        // HEAD: return headers/status only (no body)
+        if (method === 'HEAD') {
+          render([
+            `Status: ${res.status}`,
+            `Method: ${method}`,
+            `Content-Type: ${contentType}`,
+          ]);
+          return;
+        }
+
+        // GET: parse JSON body and display
+        const raw = await res.text();
+        console.log(`RAW (${method} ${url}):`, raw);
+        const data = safeJSON(raw);
+
+        if (url === '/getUsers' && data.users) {
+          render([
+            `Status: ${res.status}`,
+            '',
+            'users:',
+            JSON.stringify(data.users, null, 2),
+          ]);
+        } else {
+          render([
+            `Status: ${res.status}`,
+            '',
+            JSON.stringify(data, null, 2),
+          ]);
+        }
+      } catch (err) {
+        render(`Error: ${err.message}`);
+      }
+    });
+  });
+</script>
+
 </head>
 <body>
   <section id="top">
